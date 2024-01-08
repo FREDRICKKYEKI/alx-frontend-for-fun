@@ -14,98 +14,43 @@ Otherwise, print nothing and exit 0
 """
 import sys
 import os
+import re
 
 if __name__ == "__main__":
-    def add_header_tags(toks: list[str]) -> str:
-        """ Adds header tags
-        """
-        # if any tok contains '#' from start - end of index:
-        # get hash count and break
-        line = " ".join(toks)
-        hash_count = 0
-        for i, tok in enumerate(toks):
-            if tok.startswith("#") and len(tok) == tok.count("#"):
-                hash_count = tok.count("#")
+    def markdown_to_html(markdown_text):
+        # Convert headers
+        markdown_text = re.sub(r'^(#+)\s*(.*?)\s*$', lambda match:f"<h{len(match.group(1))}>{match.group(2)}</h{len(match.group(1))}>", markdown_text, flags=re.MULTILINE)
 
-            if hash_count in range(1, 7):
-                break
+        # Convert bold and italic
+        markdown_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', markdown_text)
+        markdown_text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', markdown_text)
 
-        line = line.replace("\n", "")
-        if hash_count != 0:
-            tag = "#"*hash_count
-            line = line.replace(f"{tag} ", f"<h{hash_count}>")
-            line += f"</h{hash_count}>\n"
+        # Convert lists
+        markdown_text = re.sub(r'^\*\s*(.*?)$', r'<li>\1</li>', markdown_text, flags=re.MULTILINE)
+        markdown_text = re.sub(r'(?<!<li>)\n', '<ul>\n', markdown_text)
+        markdown_text += '</ul>'
 
-        return line
+        return f'{markdown_text}'
 
-    if len(sys.argv) != 3:
+
+    if len(sys.argv) < 3:
         print(f"{sys.argv[0]} README.md README.html", file=sys.stderr)
         sys.exit(1)
     elif not os.path.exists(sys.argv[1]):
         print(f"Missing {sys.argv[1]}", file=sys.stderr)
         sys.exit(1)
     else:
-        file = sys.argv[1]
-        output = sys.argv[2]
+        input_file = sys.argv[1]
+        output_file = sys.argv[2]
 
-        with open(file, mode="r", encoding="UTF-8") as file_md:
-            lines = file_md.readlines()
+        with open(input_file, mode="r", encoding="UTF-8") as file_md:
+            markdown_text = file_md.read()
 
-        output_lines: list[str] = []
 
-        # #########-parsing-###########
-        for line in lines:
-            hash_count = 0
-            toks: list[str] = line.split(" ")
-            first_tok: str = toks[0]
+        html_content = markdown_to_html(markdown_text)
 
-            line = add_header_tags(toks)
+        with open(output_file, 'w') as file:
+            file.write(html_content)
 
-            # if first token is -
-            if first_tok == "-":
-                line = line.replace("- ", "\n<li>")
-                line += "</li>"
-
-            # if first token is *
-            if first_tok == "*":
-                line = line.replace("* ", "\n<oli>")
-                line += "</oli>"
-
-            output_lines.append(line)
-
-        # if list tag exists: add <ul> before
-        for i, line in enumerate(output_lines):
-            if "<li>" in line:
-                output_lines[i] = "<ul>" + line
-                break
-
-        # start from end and pick first </li> tag: add </ul> after it
-        for i in range(len(output_lines) - 1, -1, -1):
-            if "</li>" in output_lines[i]:
-                output_lines[i] = output_lines[i] + "\n</ul>\n"
-                break
-
-        # if list tag is oli: add <ol> before
-        for i, line in enumerate(output_lines):
-            if "<oli>" in line:
-                output_lines[i] = "<ol>" + line
-                break
-
-        # start from end and pick first </oli> tag: add </ol> after it
-        for i in range(len(output_lines) - 1, -1, -1):
-            if "</oli>" in output_lines[i]:
-                output_lines[i] = output_lines[i] + "\n</ol>\n"
-                break
-
-        # replace <oli> with <li> || file cleanup
-        for i, line in enumerate(output_lines):
-            output_lines[i] = output_lines[i].replace("<oli>", "<li>")
-            output_lines[i] = output_lines[i].replace("</oli>", "</li>")
-
-        # #########-end-of-parsing-###########
-
-        # write into file
-        with open(output, mode="w", encoding="UTF-8") as file_out:
-            file_out.writelines(output_lines)
 
         sys.exit(0)
